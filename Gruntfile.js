@@ -29,22 +29,33 @@ module.exports = function(grunt) {
     },
 
     // Configuration to be run (and then tested).
+    //web_regression: {
+    //  default_options: {
+    //    options: {
+    //    },
+    //    files: {
+    //      'tmp/default_options': ['test/fixtures/testing', 'test/fixtures/123']
+    //    }
+    //  },
+    //  custom_options: {
+    //    options: {
+    //      separator: ': ',
+    //      punctuation: ' !!!'
+    //    },
+    //    files: {
+    //      'tmp/custom_options': ['test/fixtures/testing', 'test/fixtures/123']
+    //    }
+    //  }
+    //},
+
     web_regression: {
       default_options: {
-        options: {
-        },
-        files: {
-          'tmp/default_options': ['test/fixtures/testing', 'test/fixtures/123']
-        }
-      },
-      custom_options: {
-        options: {
-          separator: ': ',
-          punctuation: ' !!!'
-        },
-        files: {
-          'tmp/custom_options': ['test/fixtures/testing', 'test/fixtures/123']
-        }
+        "url": "https://www.google.co.in",
+        "scriptfile": "./scripts/test/googlecode.js",
+        "testname": "Google",
+        "browser": "Chrome",
+        "casperOptions": ["--ignore-ssl-errors=true", "--ssl-protocol=any"],
+        "imageDirectory": "./images/"
       }
     },
 
@@ -65,7 +76,8 @@ module.exports = function(grunt) {
 
   // Whenever the "test" task is run, first clean the "tmp" dir, then run this
   // plugin's task(s), then test the result.
-  grunt.registerTask('test', ['clean', 'web_regression', 'nodeunit']);
+  //grunt.registerTask('test', ['clean', 'web_regression', 'nodeunit']);
+  grunt.registerTask('test', ['clean', 'web_regression']);
 
   // By default, lint and run all tests.
   grunt.registerTask('default', ['jshint', 'test']);
