@@ -1,0 +1,1 @@
+{"testPairs":[{"ref_img":"./images/Google/iPhone5_h/reference/capture_0.png","test_img":"./images/Google/iPhone5_h/test/capture_0.png","img_name":"capture_0.png","misMatchThreshold":0.1}],"comparePath":"./images/Google/iPhone5_h/compareConfig.json","test_name":"Google","imageCount":1}

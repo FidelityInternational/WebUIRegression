@@ -1,85 +1,193 @@
-/*
- * grunt-web-regression
- * https://github.com/FidelityInternational/WebUIRegression
- *
- * Copyright (c) 2017 Tirtha Guha
- * Licensed under the MIT license.
+/**
+ * http://usejsdoc.org/
  */
+var resemble = require('node-resemble-js');
+var fs = require('fs');
+var constants = require('./modules/constants');
+var runcasper = require('./libs/runcasper');
+var reporter = require('./libs/reporter');
 
-'use strict';
+function storeFailedDiffImage(filename, data, cb) {
+	console.log(filename);
+	if(filename==="" && data==null) {
+		cb();
+	}
+	var failedDiffFilename = filename;
+	console.log('Storing diff image in ' + filename);
+	var failedDiffStream = fs.createWriteStream(failedDiffFilename);
+	failedDiffStream.on('close', function() {
+		cb();
+	});
+	data.getDiffImage().pack().pipe(failedDiffStream);
+	// data.getDiffImage().pack().pipe(fs.createWriteStream(filename));
+}
+
 
 module.exports = function(grunt) {
 
-  // Project configuration.
-  grunt.initConfig({
-    jshint: {
-      all: [
-        'Gruntfile.js',
-        'tasks/*.js',
-        '<%= nodeunit.tests %>'
-      ],
-      options: {
-        jshintrc: '.jshintrc'
+	require('time-grunt')(grunt);
+
+	var packageJSON = require("./package.json");
+
+	grunt.registerTask('reference', 'Reference Creation', function() {
+		// check file exists
+		var testconfig = grunt.option("testconfig");
+		var filePath = packageJSON.appConfig.configScriptPath + testconfig + ".json";
+		//console.log(filePath.toString());
+
+
+		var config= grunt.file.readJSON(filePath);
+		//console.log(config);
+
+		// TODO: rewrite with node fs.exists. grunt filesystem seems to be crappy
+		var imagepath = packageJSON.appConfig.imagepath+config.testname+'/'+config.browser;
+		console.log("ImagePath: "+ imagepath);
+		if(grunt.file.exists(imagepath+"/reference") && grunt.file.isDir(imagepath+"/reference")){
+			grunt.file.delete(imagepath+"/reference");
+			grunt.file.delete(imagepath+"/compareConfig.json");
+		}
+		if(grunt.file.exists(imagepath+"/test") && grunt.file.isDir(imagepath+"/test")){
+			grunt.file.delete(imagepath+"/test");
+			grunt.file.delete(imagepath+"/report.html");
+		}
+		var done = this.async();
+		var launchOptions = config.casperOptions.concat(["--testname=" + config.testname,
+		                                                 "--mode=reference",
+		                                                 "--browser="+config.browser,
+		                                                 "--url="+config.url,
+		                                                 "--script="+config.scriptfile,
+		                                                 "casperStarter.js"]);
+		grunt.log.write([launchOptions]);
+		runcasper.run(grunt, launchOptions, function(error){
+			// done();
+			if(error===0) {
+				done();
+			} else {
+				done(false);
+			}
+		});
+	});
+
+
+	grunt.registerTask("test", "Combine Test and Compare", function(){
+		var testconfig = grunt.option("testconfig");
+		var filePath = packageJSON.appConfig.configScriptPath + testconfig + ".json";
+		//console.log(filePath.toString());
+		var config= grunt.file.readJSON(filePath);
+		//console.log(config);
+
+		var done = this.async();
+		var launchOptions = config.casperOptions.concat(["--testname=" + config.testname,
+		                                                 "--mode=test",
+		                                                 "--browser="+config.browser,
+		                                                 "--url="+config.url,
+		                                                 "--script="+config.scriptfile,
+                                                     "casperStarter.js"]);
+		grunt.log.write([launchOptions]);
+		var imagepath = packageJSON.appConfig.imagepath+config.testname+'/'+config.browser;
+
+		if(grunt.file.exists(imagepath+"/test") && grunt.file.isDir(imagepath+"/test")){
+			grunt.file.delete(imagepath+"/test");
+			grunt.file.delete(imagepath+"/report.html");
+		}
+		runcasper.run(grunt, launchOptions, function(error){
+			if(error===0) {
+				console.log("End of Test Capture --------------------------- ");
+			  done();
+			} else {
+				done(false);
+			}
+
+		});
+
+	});
+
+
+	grunt.registerTask("compare", "Comparison", function(){
+
+	  var done = this.async();
+	  var testconfig = grunt.option("testconfig");
+    var filePath = packageJSON.appConfig.configScriptPath + testconfig + ".json";
+    console.log("Start Comparisons --------------------------- ");
+    // console.log(filePath.toString());
+    var config= grunt.file.readJSON(filePath);
+
+	  compare();
+
+	  function compare(){
+	    var resembleTestConfig = {
+	        errorColor: {
+	          red: 155,
+	          green: 100,
+	          blue: 155
+	        },
+	        errorType: 'movement',
+	        transparency: 0.5,
+	        largeImageThreshold: 3000
+	      };
+      resemble.outputSettings(resembleTestConfig);
+      var comparepath = packageJSON.appConfig.imagepath+config.testname+'/'+config.browser;
+      if(grunt.file.exists(comparepath+'/diff') && grunt.file.isDir(comparepath+'/diff')){
+        grunt.file.delete(comparepath+'/diff');
       }
-    },
+      grunt.file.mkdir(comparepath+'/diff/');
+      console.log(comparepath);
+      var compareJS = grunt.file.readJSON(comparepath + '/compareConfig.json');
+      var counter = compareJS.imageCount;
+      var failCount = 0;
 
-    // Before generating any new files, remove any previously-created files.
-    clean: {
-      tests: ['tmp']
-    },
+      compareJS.testPairs.forEach(function(item){
+        if(!grunt.file.exists(item.test_img)) {
+          console.log("File "+item.test_img+" does nto exist, creating empty file");
+          grunt.file.copy(packageJSON.appConfig.imagepath+"/empty.png", item.test_img);
+        }
+        resemble(item.ref_img).compareTo(item.test_img).onComplete(
+            function(data) {
+              counter --;
+              console.log("Here ----------- > "+item.test_img);
+              var imageComparisonFailed = !data.isSameDimensions
+                  || data.misMatchPercentage > item.misMatchThreshold;
+              var testStatus = '';
+              if (imageComparisonFailed) {
+                testStatus = "fail";
+                console.log('MISMATCH:' + item.img_name);
+                item.status = testStatus;
+                failCount++;
+                storeFailedDiffImage(comparepath + '/diff/'+ item.img_name, data, function(){
+                  console.log("Diff Image File write complete: "+item.img_name);
+                  console.log("counter  --> "+counter);
+                  if(counter<=0) {
+                    finishComparison();
+                  }
+                });
+                item.diffFilePath = comparepath + '/diff/'+ item.img_name;
+              } else {
+                testStatus = "pass";
+                item.status = testStatus;
+                console.log('MATCHED: '+item.img_name);
+                console.log("counter  --> "+counter);
+                if(counter<=0) {
+                  finishComparison();
+                };
+              }
 
-    // Configuration to be run (and then tested).
-    //web_regression: {
-    //  default_options: {
-    //    options: {
-    //    },
-    //    files: {
-    //      'tmp/default_options': ['test/fixtures/testing', 'test/fixtures/123']
-    //    }
-    //  },
-    //  custom_options: {
-    //    options: {
-    //      separator: ': ',
-    //      punctuation: ' !!!'
-    //    },
-    //    files: {
-    //      'tmp/custom_options': ['test/fixtures/testing', 'test/fixtures/123']
-    //    }
-    //  }
-    //},
+              function finishComparison() {
+                compareJS.failCount = failCount;
+                var htmlStr = reporter.createReport(compareJS);
+                grunt.file.write(comparepath + '/report.html', htmlStr);
+                console.log("Results published in "+process.cwd()+comparepath + "\\report.html");
+                done();
+              };
+            });
 
-    web_regression: {
-      default_options: {
-        "url": "https://www.google.co.in",
-        "scriptfile": "./scripts/test/googlecode.js",
-        "testname": "Google",
-        "browser": "Chrome",
-        "casperOptions": ["--ignore-ssl-errors=true", "--ssl-protocol=any"],
-        "imageDirectory": "./images/"
-      }
-    },
+      });
 
-    // Unit tests.
-    nodeunit: {
-      tests: ['test/*_test.js']
-    }
 
-  });
+    };
 
-  // Actually load this plugin's task(s).
-  grunt.loadTasks('tasks');
+	});
 
-  // These plugins provide necessary tasks.
-  grunt.loadNpmTasks('grunt-contrib-jshint');
-  grunt.loadNpmTasks('grunt-contrib-clean');
-  grunt.loadNpmTasks('grunt-contrib-nodeunit');
+	grunt.registerTask("validate", ["test", "compare"]);
 
-  // Whenever the "test" task is run, first clean the "tmp" dir, then run this
-  // plugin's task(s), then test the result.
-  //grunt.registerTask('test', ['clean', 'web_regression', 'nodeunit']);
-  grunt.registerTask('test', ['clean', 'web_regression']);
 
-  // By default, lint and run all tests.
-  grunt.registerTask('default', ['jshint', 'test']);
-
-};
+}

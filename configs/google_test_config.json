@@ -1,0 +1,7 @@
+{
+	"url": "https://www.google.co.in",
+	"scriptfile": "./scripts/test/googlecode.js",
+	"testname": "Google",
+	"browser": "iPhone5_h",
+	"casperOptions": ["--ignore-ssl-errors=true", "--ssl-protocol=any"]
+}
