@@ -8,16 +8,21 @@ This plugin requires Grunt `~0.4.5`
 If you haven't used [Grunt](http://gruntjs.com/) before, be sure to check out the [Getting Started](http://gruntjs.com/getting-started) guide, as it explains how to create a [Gruntfile](http://gruntjs.com/sample-gruntfile) as well as install and use Grunt plugins.
 
 
-Once the plugin has been installed, it may be enabled inside your Gruntfile with this line of JavaScript:
+Web regression works in two modes:
 
+Reference Mode generates the initial screenshots.
 ```js
 grunt reference --testconfig=google_test_config
+```
+
+After every change, run it in Test mode to identify the differences.
+```js
 grunt test --testconfig=google_test_config
 ```
 
-## The "web_regression" task
+## How "web_regression" works
 
-### Overview
+### Working Example
 In your testconfig file insert.
 
 ```js
