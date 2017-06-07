@@ -15,9 +15,9 @@ Reference Mode generates the initial screenshots.
 grunt reference --testconfig=google_test_config
 ```
 
-After every change, run it in Test mode to identify the differences.
+After every change, run it in validate mode to identify the differences.
 ```js
-grunt test --testconfig=google_test_config
+grunt validate --testconfig=google_test_config
 ```
 
 ## How "web_regression" works
